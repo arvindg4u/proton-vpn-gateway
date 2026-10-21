@@ -2,6 +2,7 @@
 Description=Rotate Proton exit IP on upstream 429
 After=network-online.target
 
+# NOTE: setup-new-vm.sh rewrites the /home/ubuntu paths to this user's home.
 [Service]
 Type=simple
 ExecStart=/usr/bin/python3 /home/ubuntu/proton-proxy/rotate_on_429.py

@@ -3,6 +3,7 @@ Description=Claude Code Proxy (Anthropic API -> OpenCode ZEN, via Proton VPN)
 After=network-online.target
 Wants=network-online.target
 
+# NOTE: setup-new-vm.sh rewrites the /home/ubuntu paths to this user's home.
 [Service]
 Type=simple
 WorkingDirectory=/home/ubuntu/tor-proxy-toolkit/claude-code-proxy
