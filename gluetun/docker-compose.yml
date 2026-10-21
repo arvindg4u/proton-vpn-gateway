@@ -1,0 +1,33 @@
+services:
+  gluetun:
+    image: qmcgaw/gluetun
+    container_name: gluetun
+    cap_add:
+      - NET_ADMIN
+    devices:
+      - /dev/net/tun:/dev/net/tun
+    ports:
+      # 127.0.0.1 = proxy only reachable from inside this VM.
+      # NEVER change to "8888:8888" or the host becomes an open proxy.
+      - "127.0.0.1:8888:8888"
+    environment:
+      - VPN_SERVICE_PROVIDER=protonvpn
+      - VPN_TYPE=wireguard
+      - WIREGUARD_PRIVATE_KEY=${WIREGUARD_PRIVATE_KEY}
+      # Country is rotated by rotate_on_429.py (in .env) to move to another
+      # free-tier server and get a fresh exit IP.
+      - SERVER_COUNTRIES=${SERVER_COUNTRIES:-Netherlands}
+      - FREE_ONLY=on
+      # REQUIRED, not optional: Proton's servers reset the DoT handshake
+      # (port 853) to cloudflare-dns.com. gluetun's DNS then cannot resolve
+      # anything, its healthcheck fails and it restarts the VPN in a loop
+      # (observed: 906 restarts, 2049 failed healthchecks, tunnel unusable).
+      # Plain DNS over the tunnel is small-packet UDP and is not reset.
+      - DNS_UPSTREAM_RESOLVER_TYPE=plain
+      - DNS_UPSTREAM_PLAIN_ADDRESSES=1.1.1.1:53,8.8.8.8:53
+      # Proton free servers also throttle/drop ICMP echo, which fails the
+      # per-minute healthcheck for no real reason -> use a DNS check instead.
+      - HEALTH_SMALL_CHECK_TYPE=dns
+      - HEALTH_RESTART_VPN=on
+      - HTTPPROXY=on
+    restart: unless-stopped

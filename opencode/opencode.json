@@ -1,0 +1,25 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "provider": {
+    "zenproxy": {
+      "npm": "@ai-sdk/anthropic",
+      "name": "ZEN via local claude-code-proxy",
+      "options": {
+        "baseURL": "http://127.0.0.1:4013/v1",
+        "apiKey": "sk-local-claude-code"
+      },
+      "models": {
+        "sonnet": {
+          "name": "Sonnet (ZEN via proxy)"
+        },
+        "haiku": {
+          "name": "Haiku (ZEN via proxy)"
+        },
+        "opus": {
+          "name": "Opus (ZEN via proxy)"
+        }
+      }
+    }
+  },
+  "model": "zenproxy/sonnet"
+}

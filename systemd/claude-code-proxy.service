@@ -1,0 +1,25 @@
+[Unit]
+Description=Claude Code Proxy (Anthropic API -> OpenCode ZEN, via Proton VPN)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/home/ubuntu/tor-proxy-toolkit/claude-code-proxy
+# secrets + model mapping from the toolkit env
+EnvironmentFile=/home/ubuntu/tor-proxy-toolkit/.env
+# upstream traffic through the local gluetun/Proton proxy (loopback only)
+Environment=HTTPS_PROXY=http://127.0.0.1:8888
+Environment=HTTP_PROXY=http://127.0.0.1:8888
+Environment=NO_PROXY=localhost,127.0.0.1,::1
+Environment=HOST=127.0.0.1
+Environment=PORT=4013
+ExecStart=/home/ubuntu/tor-proxy-toolkit/claude-code-proxy/.venv/bin/python /home/ubuntu/tor-proxy-toolkit/claude-code-proxy/start_proxy.py
+Restart=always
+RestartSec=2
+StartLimitIntervalSec=0
+StandardOutput=append:/var/log/tor-toolkit/claude-proxy.log
+StandardError=append:/var/log/tor-toolkit/claude-proxy.log
+
+[Install]
+WantedBy=default.target

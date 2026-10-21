@@ -1,0 +1,14 @@
+[Unit]
+Description=Rotate Proton exit IP on upstream 429
+After=network-online.target
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/python3 /home/ubuntu/proton-proxy/rotate_on_429.py
+Restart=always
+RestartSec=10
+StandardOutput=append:/var/log/tor-toolkit/proton-rotate.log
+StandardError=append:/var/log/tor-toolkit/proton-rotate.log
+
+[Install]
+WantedBy=default.target
