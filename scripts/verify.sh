@@ -45,7 +45,7 @@ if systemctl --user is-active --quiet proton-rotate.service; then ok "service ac
 echo
 echo "=== CLIs ==="
 if command -v opencode >/dev/null 2>&1; then
-  if [ -n "${KILO_API_KEY:-}" ] && grep -q KILO_API_KEY "$HOME/.config/opencode/opencode.env" 2>/dev/null; then
+  if grep -q "^KILO_API_KEY=." "$HOME/.config/opencode/opencode.env" 2>/dev/null; then
     R=$(timeout 150 opencode run -m "kilo/minimax/minimax-m3.1-flash:free" "reply with exactly: OK" 2>&1 | tail -1)
     echo "$R" | grep -q OK && ok "opencode (kilo provider, via VPN)" || warn "opencode/kilo: ${R:0:120}"
   else
