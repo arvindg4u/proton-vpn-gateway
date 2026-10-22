@@ -30,14 +30,18 @@ sudo bash scripts/setup-new-vm.sh --key "<Proton PrivateKey>"
 bash scripts/verify.sh
 ```
 
-`--key` nahi doge to script poochaega. Proton key kahan se: Proton account →
-Downloads → WireGuard configuration → `PrivateKey = ...` (ek key saare free-tier
-servers of same region pe chalti hai).
+`--key` nahi doge to script poochaega. Kilo Code gateway key bhi poochega
+(optional — skip kar doge to `kilo` provider kaam nahi karega, `zenproxy` chalega).
+
+Proton key kahan se: Proton account → Downloads → WireGuard configuration →
+`PrivateKey = ...` (ek key saare free-tier servers of same region pe chalti hai).
 
 Setup script ye karta hai: docker + compose install → gluetun container (key
 ke saath, health wait karke) → Bun runtime → `tor-proxy-toolkit` clone + venv +
-`.env` (minimax models, naya session id, proxy env) → systemd units (dono
-enable + linger) → OpenCode `zenproxy` provider → `.bashrc` aliases.
+`.env` (minimax models, naya session id, proxy env) → systemd units
+(claude-code-proxy, proton-rotate, opencode daemon) + linger → OpenCode config
+(default `kilo/...` + `zenproxy` provider) + `opencode.env` (Kilo key) →
+`.bashrc` aliases.
 
 ## Repo layout
 
@@ -48,7 +52,9 @@ enable + linger) → OpenCode `zenproxy` provider → `.bashrc` aliases.
 | `gluetun/rotate_on_429.py` | 429 pe free-tier country switch → naya exit IP |
 | `systemd/claude-code-proxy.service` | proxy ko systemd user service banata hai |
 | `systemd/proton-rotate.service` | rotation daemon (auto-restart) |
-| `opencode/opencode.json` | OpenCode ka `zenproxy` provider (local proxy route) |
+| `systemd/opencode.service` | OpenCode daemon as a service (proxy env + API key) |
+| `opencode/opencode.json` | OpenCode config: default model `kilo/...` + `zenproxy` provider |
+| `opencode/opencode.env.example` | `KILO_API_KEY` template (real file 600, gitignored) |
 | `scripts/setup-new-vm.sh` | new VM ka one-shot installer |
 | `scripts/verify.sh` | poora chain ka health check |
 | `docs/FINDINGS.md` | ZEN gate + network ka reverse-engineering notes |
@@ -56,15 +62,29 @@ enable + linger) → OpenCode `zenproxy` provider → `.bashrc` aliases.
 Dependencies: [tor-proxy-toolkit](https://github.com/arvindg4u/tor-proxy-toolkit)
 (mein claude-code-proxy hai — Bun transport + OpenCode identity usme hai).
 
+## Providers
+
+| provider | kahan se | key |
+|---|---|---|
+| `kilo/...` (default) | Kilo Code gateway, `https://api.kilo.ai/api/gateway` | `KILO_API_KEY` → `~/.config/opencode/opencode.env` |
+| `zenproxy/sonnet` | local claude-code-proxy → OpenCode ZEN | built into the proxy |
+
+OpenCode ke built-in `kilo` provider ko sirf `KILO_API_KEY` chahiye (wo
+`Authorization: Bearer` ki tarah use karta hai, koi extra header nahi).
+Kilo ke free models me `minimax/minimax-m3.1-flash:free` (1M context) hai.
+
 ## Daily use
 
 ```bash
 # exit IP check
 curl -x http://127.0.0.1:8888 https://ifconfig.me
 
-# OpenCode: local proxy route (ZEN free quota khatam ho to bhi chalta hai)
+# OpenCode (default = kilo provider, VPN ke through)
+opencode
+opencode run -m "kilo/minimax/minimax-m3.1-flash:free" "hello"
+
+# ZEN route (local claude-code-proxy)
 opencode run -m zenproxy/sonnet "hello"
-opencode                      # default model zenproxy/sonnet
 
 # Claude Code (ANTHROPIC_BASE_URL=http://127.0.0.1:4013 already set)
 claude -p "hello"

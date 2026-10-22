@@ -124,13 +124,47 @@ sleep 4
 systemctl --user is-active claude-code-proxy.service proton-rotate.service
 
 # ── 6. OpenCode provider (routes the CLI through the proxy) ─────────────────
-log "OpenCode provider"
+log "OpenCode"
 mkdir -p "$HOME/.config/opencode"
 if [ -f "$HOME/.config/opencode/opencode.json" ]; then
   cp "$HOME/.config/opencode/opencode.json" "$HOME/.config/opencode/opencode.json.bak"
   warn "existing opencode.json backed up to opencode.json.bak - merge the zenproxy provider by hand"
 else
   cp "$REPO_DIR/opencode/opencode.json" "$HOME/.config/opencode/opencode.json"
+fi
+
+# Kilo Code gateway key: opencode's built-in "kilo" provider reads KILO_API_KEY
+KILO_KEY=""
+if [ -f "$HOME/.config/opencode/opencode.env" ]; then
+  KILO_KEY=$(grep '^KILO_API_KEY=' "$HOME/.config/opencode/opencode.env" | cut -d= -f2-)
+fi
+if [ -z "$KILO_KEY" ]; then
+  if [ -t 0 ]; then
+    read -r -p "Kilo Code API key (KILO_API_KEY, leave empty to skip): " KILO_KEY
+  else
+    KILO_KEY=""
+  fi
+fi
+if [ -n "$KILO_KEY" ]; then
+  umask 077
+  {
+    grep -v '^KILO_API_KEY=' "$HOME/.config/opencode/opencode.env" 2>/dev/null || true
+    echo "KILO_API_KEY=$KILO_KEY"
+  } > "$HOME/.config/opencode/opencode.env"
+  chmod 600 "$HOME/.config/opencode/opencode.env"
+  echo "KILO_API_KEY written to ~/.config/opencode/opencode.env (600)"
+fi
+
+# opencode daemon as a systemd service (keeps the proxy env + API key)
+if [ -x "$HOME/.opencode/bin/opencode" ]; then
+  cp "$REPO_DIR/systemd/opencode.service" "$HOME/.config/systemd/user/"
+  systemctl --user daemon-reload
+  "$HOME/.opencode/bin/opencode" service stop >/dev/null 2>&1 || true
+  systemctl --user enable --now opencode.service
+  sleep 4
+  systemctl --user is-active opencode.service
+else
+  warn "opencode CLI not found at ~/.opencode/bin/opencode - skipping the daemon service"
 fi
 
 # ── 7. shell aliases ────────────────────────────────────────────────────────

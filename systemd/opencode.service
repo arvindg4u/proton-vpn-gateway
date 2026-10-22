@@ -1,0 +1,21 @@
+[Unit]
+Description=OpenCode server (model calls through the local gluetun/Proton proxy)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+# API keys for providers (KILO_API_KEY, ...)
+EnvironmentFile=%h/.config/opencode/opencode.env
+# upstream traffic through the loopback-only gluetun proxy
+Environment=HTTPS_PROXY=http://127.0.0.1:8888
+Environment=HTTP_PROXY=http://127.0.0.1:8888
+Environment=NO_PROXY=localhost,127.0.0.1,::1
+ExecStart=%h/.opencode/bin/opencode serve --service
+Restart=always
+RestartSec=5
+StandardOutput=append:%h/.local/share/opencode/service.log
+StandardError=append:%h/.local/share/opencode/service.log
+
+[Install]
+WantedBy=default.target

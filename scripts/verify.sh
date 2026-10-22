@@ -45,8 +45,14 @@ if systemctl --user is-active --quiet proton-rotate.service; then ok "service ac
 echo
 echo "=== CLIs ==="
 if command -v opencode >/dev/null 2>&1; then
+  if [ -n "${KILO_API_KEY:-}" ] && grep -q KILO_API_KEY "$HOME/.config/opencode/opencode.env" 2>/dev/null; then
+    R=$(timeout 150 opencode run -m "kilo/minimax/minimax-m3.1-flash:free" "reply with exactly: OK" 2>&1 | tail -1)
+    echo "$R" | grep -q OK && ok "opencode (kilo provider, via VPN)" || warn "opencode/kilo: ${R:0:120}"
+  else
+    warn "KILO_API_KEY missing - opencode kilo provider not configured"
+  fi
   R=$(timeout 120 opencode run -m zenproxy/sonnet "reply with exactly: OK" 2>&1 | tail -1)
-  echo "$R" | grep -q OK && ok "opencode (via local proxy)" || warn "opencode: ${R:0:120}"
+  echo "$R" | grep -q OK && ok "opencode (zenproxy, via local proxy)" || warn "opencode/zenproxy: ${R:0:120}"
 fi
 if command -v claude >/dev/null 2>&1; then
   R=$(cd /tmp && timeout 120 claude -p "reply with exactly: OK" 2>&1 | tail -1)
