@@ -1,6 +1,6 @@
 {
   "$schema": "https://opencode.ai/config.json",
-  "model": "kilo/minimax/minimax-m3.1-flash:free",
+  "model": "opencode/minimax-m3.1-flash-free",
   "provider": {
     "zenproxy": {
       "npm": "@ai-sdk/anthropic",

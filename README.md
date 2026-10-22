@@ -53,7 +53,7 @@ ke saath, health wait karke) → Bun runtime → `tor-proxy-toolkit` clone + ven
 | `systemd/claude-code-proxy.service` | proxy ko systemd user service banata hai |
 | `systemd/proton-rotate.service` | rotation daemon (auto-restart) |
 | `systemd/opencode.service` | OpenCode daemon as a service (proxy env + API key) |
-| `opencode/opencode.json` | OpenCode config: default model `kilo/...` + `zenproxy` provider |
+| `opencode/opencode.json` | OpenCode config: default `opencode/...` + `zenproxy` provider |
 | `opencode/opencode.env.example` | `KILO_API_KEY` template (real file 600, gitignored) |
 | `scripts/setup-new-vm.sh` | new VM ka one-shot installer |
 | `scripts/verify.sh` | poora chain ka health check |
@@ -66,12 +66,23 @@ Dependencies: [tor-proxy-toolkit](https://github.com/arvindg4u/tor-proxy-toolkit
 
 | provider | kahan se | key |
 |---|---|---|
-| `kilo/...` (default) | Kilo Code gateway, `https://api.kilo.ai/api/gateway` | `KILO_API_KEY` → `~/.config/opencode/opencode.env` |
+| `opencode/...` (default) | OpenCode ka apna provider (opencode.ai) | CLI ke apne account se |
+| `kilo/...` | Kilo Code gateway, `https://api.kilo.ai/api/gateway` | `KILO_API_KEY` → `~/.config/opencode/opencode.env` |
 | `zenproxy/sonnet` | local claude-code-proxy → OpenCode ZEN | built into the proxy |
+
+Default model `opencode/minimax-m3.1-flash-free` (1M context) hai.
+
+**Quota note**: opencode provider ka free-usage limit **account-level** hota
+hai ("Free usage limit reached ... reset 5:30 AM") — ye config se fix nahi
+hota, bas wait karna padta hai. Us waqt `kilo` provider alag quota use karta
+hai aur chalata rehta hai:
+
+```bash
+opencode run -m "kilo/minimax/minimax-m3.1-flash:free" "hello"
+```
 
 OpenCode ke built-in `kilo` provider ko sirf `KILO_API_KEY` chahiye (wo
 `Authorization: Bearer` ki tarah use karta hai, koi extra header nahi).
-Kilo ke free models me `minimax/minimax-m3.1-flash:free` (1M context) hai.
 
 ## Daily use
 
@@ -79,8 +90,11 @@ Kilo ke free models me `minimax/minimax-m3.1-flash:free` (1M context) hai.
 # exit IP check
 curl -x http://127.0.0.1:8888 https://ifconfig.me
 
-# OpenCode (default = kilo provider, VPN ke through)
+# OpenCode (default = opencode provider, VPN ke through)
 opencode
+opencode run -m "opencode/minimax-m3.1-flash-free" "hello"
+
+# quota khatam ho to kilo provider (alag quota)
 opencode run -m "kilo/minimax/minimax-m3.1-flash:free" "hello"
 
 # ZEN route (local claude-code-proxy)
