@@ -14,9 +14,14 @@ services:
       - VPN_SERVICE_PROVIDER=protonvpn
       - VPN_TYPE=wireguard
       - WIREGUARD_PRIVATE_KEY=${WIREGUARD_PRIVATE_KEY}
-      # Country is rotated by rotate_on_429.py (in .env) to move to another
-      # free-tier server and get a fresh exit IP.
-      - SERVER_COUNTRIES=${SERVER_COUNTRIES:-Netherlands}
+      # Pinned by hostname, NOT by country. gluetun AND-s these filters, so
+      # passing SERVER_COUNTRIES alongside SERVER_HOSTNAMES matches nothing
+      # and the tunnel never comes up:
+      #   "no server found: for VPN wireguard; protocol udp; country mexico;
+      #    hostname node-jp-39.protonvpn.net; free tier only"
+      # Do NOT re-add SERVER_COUNTRIES. rotate_on_429.py rewrites
+      # SERVER_HOSTNAMES in .env and recreates the container.
+      - SERVER_HOSTNAMES=${SERVER_HOSTNAMES:-node-jp-39.protonvpn.net}
       - FREE_ONLY=on
       # REQUIRED, not optional: Proton's servers reset the DoT handshake
       # (port 853) to cloudflare-dns.com. gluetun's DNS then cannot resolve

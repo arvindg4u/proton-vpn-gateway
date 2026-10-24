@@ -40,7 +40,7 @@ if echo "$RESP" | grep -q '"text"'; then ok "API round trip OK"; else warn "API 
 
 echo
 echo "=== rotation service ==="
-if systemctl --user is-active --quiet proton-rotate.service; then ok "service active (429 -> switch free-tier country -> new exit IP)"; else warn "service inactive: systemctl --user start proton-rotate.service"; fi
+if systemctl --user is-active --quiet proton-rotate.service; then ok "service active (429 -> pin next hostname from servers.txt -> new exit IP)"; else warn "service inactive: systemctl --user start proton-rotate.service"; fi
 
 echo
 echo "=== CLIs ==="

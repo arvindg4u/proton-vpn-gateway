@@ -5,7 +5,7 @@ After=network-online.target
 # NOTE: setup-new-vm.sh rewrites the /home/ubuntu paths to this user's home.
 [Service]
 Type=simple
-ExecStart=/usr/bin/python3 /home/ubuntu/proton-proxy/rotate_on_429.py
+ExecStart=/usr/bin/python3 /home/ubuntu/proton-vpn-gateway/gluetun/rotate_on_429.py
 Restart=always
 RestartSec=10
 StandardOutput=append:/var/log/tor-toolkit/proton-rotate.log

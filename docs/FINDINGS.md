@@ -109,9 +109,16 @@ Practical: chhota context ya non-reasoning model, ya nayi session.
   segments drop hote the → TLS handshake 546ms (retransmit). `WIREGUARD_MTU=1280`
   se ~290ms.
 - **Exit IP rotate karna**: gluetun har restart pe wahi "best" server pick
-  karta hai → same exit IP. Country badalna padta hai (`.env:SERVER_COUNTRIES`).
-  Free-tier countries: Netherlands, United States, Japan, Singapore, Poland,
-  Romania, Norway, Canada, Mexico.
+  karta hai → same exit IP. `gluetun/servers.txt` me free-tier hostnames hain
+  (hostname → stable exit IP), aur rotate_on_429.py `.env:SERVER_HOSTNAMES`
+  ko next host pe rewrite karta hai.
+- **SERVER_COUNTRIES + SERVER_HOSTNAMES ek saath mat do**: gluetun in dono
+  filters ko AND karta hai, isliye `SERVER_COUNTRIES=Mexico` ke saath
+  `SERVER_HOSTNAMES=node-jp-39.protonvpn.net` ka koi server match nahi karta:
+  `no server found: for VPN wireguard; protocol udp; country mexico;
+  hostname node-jp-39.protonvpn.net; free tier only`. Tunnel up hi nahi hota
+  (no tun0, no exit IP, healthcheck restart loop — 13+ ghante yahi hua tha).
+  Hostname pin karte waqt `SERVER_COUNTRIES` bilkul hata do.
 - **Cloudflare edge IP**: `opencode.ai` ke apne A records (172.65.90.x) se
   Oracle Mumbai ka path kharab hai (TLS handshake 420-440ms vs 13-23ms dusre
   Cloudflare IPs pe). Pinning se direct path ~250ms ho jata hai, par ye

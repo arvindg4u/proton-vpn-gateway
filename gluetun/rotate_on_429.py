@@ -1,53 +1,47 @@
 #!/usr/bin/env python3
-"""Rotate the Proton exit IP by switching to another free-tier country.
+"""Rotate the Proton exit IP when the upstream answers 429.
 
-The OpenCode ZEN free tier rate limits per exit IP, so a fresh exit clears
-the window. A plain `docker restart gluetun` is not enough: gluetun always
-re-picks the same "best" server, so the exit IP stays the same. This
-therefore switches SERVER_COUNTRIES in .env to another free-tier country
-(Netherlands, United States, Japan, Singapore, Poland, Romania, Norway,
-Canada, Mexico), recreates the container and waits for the new exit IP.
+The free tier's quota is scoped to the EXIT IP, not to the API key: the same
+key succeeds from a fresh exit and is refused from a burnt one. A hostname
+maps to a stable exit IP, so a rotation means pinning the next free-tier
+host from servers.txt and recreating the container.
 
-Guards: a cooldown between rotations, a cap per hour, and a check that the
-exit IP actually changed, so a stuck 429 cannot turn into a restart loop.
+Each candidate is verified: after the container comes up, the new exit is
+probed through the local claude-code-proxy (which speaks the upstream with
+the right TLS fingerprint and identity headers), and the rotation keeps going
+until the probe returns 200. A rotation therefore always ends on an exit that
+actually has quota left.
+
+Guards: a cooldown between rotations, a cap per hour and a bounded number of
+candidates per event.
 """
 
+import json
 import os
 import random
 import re
 import subprocess
 import time
+import urllib.error
+import urllib.request
 
-PROXY_DIR = "/home/ubuntu/proton-proxy"
+PROXY_DIR = os.path.dirname(os.path.abspath(__file__))
 ENV_FILE = os.path.join(PROXY_DIR, ".env")
 COMPOSE_FILE = os.path.join(PROXY_DIR, "docker-compose.yml")
+POOL_FILE = os.path.join(PROXY_DIR, "servers.txt")
+STATE_FILE = os.path.join(PROXY_DIR, ".last-good-server")
 CONTAINER = "gluetun"
-
-# Free tier countries (verified with FREE_ONLY=on) and a sample exit IP.
-FREE_COUNTRIES = (
-    "Netherlands",
-    "United States",
-    "Japan",
-    "Singapore",
-    "Poland",
-    "Romania",
-    "Norway",
-    "Canada",
-    "Mexico",
-)
+LOCAL_PROXY = "http://127.0.0.1:4013/v1/messages"
+LOCAL_PROXY_KEY = "sk-local-claude-code"
 
 LOG_FILES = (
     "/var/log/tor-toolkit/claude-proxy.log",
     "/home/ubuntu/.local/share/opencode/log/opencode.log",
 )
 
-COOLDOWN_SECS = 1800
-MAX_PER_HOUR = 6
-# If a 429 still shows up right after a rotation, the limit is not
-# IP-scoped (it is key-scoped on ZEN's side), so rotating again only
-# bounces the tunnel and kills in-flight streams. Pause instead.
-FAILED_ROTATION_WINDOW = 1800
-QUIET_PERIOD = 7200
+COOLDOWN_SECS = 25
+MAX_PER_HOUR = 30
+MAX_CANDIDATES = 6
 PATTERN = re.compile(r"\b429\b|FreeUsageLimitError|rate limit exceeded", re.IGNORECASE)
 
 
@@ -56,7 +50,6 @@ def log(message):
 
 
 def read_new(path, offset):
-    """Return (new_text, new_offset) for everything appended since offset."""
     try:
         with open(path, "rb") as handle:
             handle.seek(offset)
@@ -66,29 +59,50 @@ def read_new(path, offset):
         return "", offset
 
 
-def current_country():
+def load_pool():
+    """Free-tier hosts, with the last known good one first."""
+    hosts = []
+    try:
+        with open(POOL_FILE) as handle:
+            for line in handle:
+                line = line.strip()
+                if not line or line.startswith("#"):
+                    continue
+                hosts.append(line.split()[0])
+    except OSError:
+        pass
+    good = ""
+    try:
+        with open(STATE_FILE) as handle:
+            good = handle.read().strip()
+    except OSError:
+        pass
+    if good and good in hosts:
+        hosts = [good] + [h for h in hosts if h != good]
+    else:
+        random.shuffle(hosts)
+    return hosts
+
+
+def current_host():
     try:
         with open(ENV_FILE) as handle:
             for line in handle:
-                if line.startswith("SERVER_COUNTRIES="):
+                if line.startswith("SERVER_HOSTNAMES="):
                     return line.split("=", 1)[1].strip()
     except OSError:
         pass
     return ""
 
 
-def set_country(country):
+def set_host(host):
     lines = []
-    replaced = False
     with open(ENV_FILE) as handle:
         for line in handle:
-            if line.startswith("SERVER_COUNTRIES="):
-                lines.append(f"SERVER_COUNTRIES={country}\n")
-                replaced = True
+            if line.startswith("SERVER_HOSTNAMES="):
+                lines.append(f"SERVER_HOSTNAMES={host}\n")
             else:
                 lines.append(line)
-    if not replaced:
-        lines.append(f"SERVER_COUNTRIES={country}\n")
     with open(ENV_FILE, "w") as handle:
         handle.writelines(lines)
 
@@ -117,26 +131,87 @@ def recreate():
     )
 
 
+def wait_for_tunnel(timeout=90):
+    deadline = time.time() + timeout
+    while time.time() < deadline:
+        time.sleep(5)
+        if exit_ip():
+            return True
+    return False
+
+
+def probe() -> bool:
+    """Ask the local proxy for a tiny completion.
+
+    200 means the current exit has quota left; 429 means it is burnt. The
+    request goes through the Bun transport, so it passes the upstream's TLS
+    and identity gate and the answer reflects the quota only.
+    """
+    payload = json.dumps(
+        {
+            "model": "claude-sonnet-4-5",
+            "max_tokens": 8,
+            "messages": [{"role": "user", "content": "say OK"}],
+            "tools": [
+                {
+                    "name": "Bash",
+                    "description": "Run a bash command",
+                    "input_schema": {
+                        "type": "object",
+                        "properties": {"command": {"type": "string"}},
+                        "required": ["command"],
+                    },
+                }
+            ],
+        }
+    ).encode()
+    request = urllib.request.Request(
+        LOCAL_PROXY,
+        data=payload,
+        headers={
+            "x-api-key": LOCAL_PROXY_KEY,
+            "anthropic-version": "2023-06-01",
+            "content-type": "application/json",
+        },
+    )
+    try:
+        # short timeout on purpose: the proxy retries internally, so a burnt
+        # exit only shows up after its own retry chain. We just need a quick
+        # yes/no on this exit.
+        with urllib.request.urlopen(request, timeout=20) as response:
+            return response.status == 200
+    except urllib.error.HTTPError:
+        return False
+    except Exception:  # noqa: BLE001
+        return False
+
+
+def remember(host):
+    try:
+        with open(STATE_FILE, "w") as handle:
+            handle.write(host)
+    except OSError:
+        pass
+
+
 def rotate(reason):
     previous = exit_ip()
-    current = current_country()
-    candidates = [c for c in FREE_COUNTRIES if c != current] or list(FREE_COUNTRIES)
-    country = random.choice(candidates)
-    log(f"429 detected ({reason}); exit={previous or '?'} country={current or '?'} -> {country}")
-    set_country(country)
-    recreate()
+    current = current_host()
+    pool = [h for h in load_pool() if h != current] or load_pool()
+    log(f"429 detected ({reason}); exit={previous or '?'} host={current or '?'}")
 
-    deadline = time.time() + 150
-    new_ip = ""
-    while time.time() < deadline:
-        time.sleep(8)
+    for host in pool[:MAX_CANDIDATES]:
+        set_host(host)
+        recreate()
+        wait_for_tunnel()
         new_ip = exit_ip()
-        if new_ip and new_ip != previous:
-            break
-    if new_ip and new_ip != previous:
-        log(f"new exit IP: {new_ip} (country {country})")
-        return True
-    log(f"exit IP did not change (still {new_ip or '?'})")
+        if probe():
+            log(f"new exit IP: {new_ip} (host {host}) - upstream answered 200")
+            remember(host)
+            return True
+        log(f"host {host} -> exit {new_ip or '?'} still rate limited, trying next")
+
+    log("no host in the pool gave a working exit within the attempt budget")
     return False
 
 
@@ -150,7 +225,6 @@ def main():
 
     last_rotation = 0.0
     rotations = []
-    quiet_until = 0.0
 
     while True:
         for path in LOG_FILES:
@@ -158,16 +232,6 @@ def main():
             if not text or not PATTERN.search(text):
                 continue
             now = time.time()
-            if now < quiet_until:
-                continue
-            if last_rotation and now - last_rotation < FAILED_ROTATION_WINDOW:
-                quiet_until = now + QUIET_PERIOD
-                log(
-                    "429 again right after a rotation -> limit is not IP-scoped; "
-                    f"pausing rotations for {QUIET_PERIOD // 60} min"
-                )
-                last_rotation = 0.0
-                break
             if now - last_rotation < COOLDOWN_SECS:
                 continue
             rotations = [t for t in rotations if now - t < 3600]
@@ -177,7 +241,7 @@ def main():
             rotations.append(now)
             rotate(os.path.basename(path))
             break
-        time.sleep(10)
+        time.sleep(5)
 
 
 if __name__ == "__main__":

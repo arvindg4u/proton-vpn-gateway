@@ -1,0 +1,24 @@
+# Free-tier Proton servers, one hostname per line.
+# Format: <hostname> <exit-ip> <country> <city>
+#
+# The free tier's quota is scoped to the EXIT IP, and a hostname maps to a
+# stable exit IP. When ZEN answers 429 the rotation walks this list, pins the
+# next hostname and keeps the one whose exit still has quota.
+#
+# Discovered with FREE_ONLY=on against the free tier; regenerate with
+# scripts/discover-servers.sh when the list goes stale.
+node-jp-39.protonvpn.net 37.19.205.201 Japan Tokyo
+node-ca-25.protonvpn.net 185.98.171.245 Canada Toronto
+node-ca-26.protonvpn.net 185.98.171.249 Canada Toronto
+node-ca-31.protonvpn.net 149.22.82.4 Canada Toronto
+node-ca-34.protonvpn.net 212.104.215.152 Canada Vancouver
+node-ca-71.protonvpn.net 195.242.214.69 Canada Montreal
+node-ca-74.protonvpn.net 195.242.214.117 Canada Montreal
+node-ca-75.protonvpn.net 195.242.214.133 Canada Montreal
+node-jp-35.protonvpn.net 212.102.51.31 Japan Tokyo
+node-jp-59.protonvpn.net 159.26.119.229 Japan Tokyo
+node-mx-16.protonvpn.net 205.147.22.18 Mexico Mexico City
+node-nl-157.protonvpn.net 149.34.244.177 Netherlands Amsterdam
+node-nl-161.protonvpn.net 185.107.56.65 Netherlands Roosendaal
+node-nl-169.protonvpn.net 89.38.99.102 Netherlands Naaldwijk
+node-nl-251.protonvpn.net 185.132.134.73 Netherlands Naaldwijk

@@ -16,8 +16,9 @@ proxy + OpenCode + Claude Code CLI ka traffic.
 
 - **Loopback only** — proxy sirf `127.0.0.1:8888` pe publish hota hai, kabhi
   public pe nahi ( warna VM open proxy ban jata hai).
-- **Auto exit-IP rotation** — 429 aaye to agla free-tier country (NL, US, JP,
-  SG, PL, RO, NO, CA, MX) pick karke naya exit IP.
+- **Auto exit-IP rotation** — 429 aaye to `gluetun/servers.txt` se agla
+  free-tier hostname pin karke naya exit IP, aur naya exit 200 dene tak
+  agla try karta hai.
 - **Zero-downtime proxy** — claude-code-proxy systemd user service hai, crash
   pe khud restart hota hai, bind conflict pe retry karta hai.
 
@@ -48,8 +49,9 @@ ke saath, health wait karke) → Bun runtime → `tor-proxy-toolkit` clone + ven
 | path | kya hai |
 |---|---|
 | `gluetun/docker-compose.yml` | Proton/gluetun container (loopback HTTP proxy) |
-| `gluetun/.env.example` | `WIREGUARD_PRIVATE_KEY` + exit country |
-| `gluetun/rotate_on_429.py` | 429 pe free-tier country switch → naya exit IP |
+| `gluetun/.env.example` | `WIREGUARD_PRIVATE_KEY` + `SERVER_HOSTNAMES` |
+| `gluetun/servers.txt` | free-tier hostname pool (hostname → exit IP → country) |
+| `gluetun/rotate_on_429.py` | 429 pe next hostname pin + 200 tak probe → naya exit IP |
 | `systemd/claude-code-proxy.service` | proxy ko systemd user service banata hai |
 | `systemd/proton-rotate.service` | rotation daemon (auto-restart) |
 | `systemd/opencode.service` | OpenCode daemon as a service (proxy env + API key) |

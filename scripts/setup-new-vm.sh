@@ -42,6 +42,7 @@ log "gluetun (Proton exit)"
 mkdir -p "$GATEWAY_DIR/gluetun"
 cp -n "$REPO_DIR/gluetun/docker-compose.yml" "$GATEWAY_DIR/gluetun/" 2>/dev/null || true
 cp -n "$REPO_DIR/gluetun/rotate_on_429.py" "$GATEWAY_DIR/gluetun/" 2>/dev/null || true
+cp -n "$REPO_DIR/gluetun/servers.txt" "$GATEWAY_DIR/gluetun/" 2>/dev/null || true
 chmod +x "$GATEWAY_DIR/gluetun/rotate_on_429.py"
 
 if [ -z "$PROTON_KEY" ] && [ -f "$GATEWAY_DIR/gluetun/.env" ]; then
@@ -55,7 +56,7 @@ fi
 umask 077
 cat > "$GATEWAY_DIR/gluetun/.env" <<EOF
 WIREGUARD_PRIVATE_KEY=$PROTON_KEY
-SERVER_COUNTRIES=Netherlands
+SERVER_HOSTNAMES=node-jp-39.protonvpn.net
 EOF
 chmod 600 "$GATEWAY_DIR/gluetun/.env"
 
